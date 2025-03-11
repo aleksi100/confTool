@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include "serialcommunicator.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -15,7 +16,11 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
+private slots:
+    void displayMessage(const QString &message);
+
 private:
     Ui::MainWindow *ui;
+    SerialCommunicator *m_serialComm;
 };
 #endif // MAINWINDOW_H
