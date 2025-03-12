@@ -1,4 +1,5 @@
 #include "serialcommunicator.h"
+#include "mainwindow.h"
 #include <QDebug>
 
 SerialCommunicator::SerialCommunicator(QObject *parent)
@@ -65,6 +66,15 @@ void SerialCommunicator::handleReadyRead()
 
 void SerialCommunicator::processPacket(const QByteArray &data)
 {
+    if (data.size() >= sizeof(system_data_to_pc)) {
+        system_data_to_pc *sysMsg = reinterpret_cast<system_data_to_pc*>(const_cast<char*>(data.data()));
+        if (sysMsg->id == ID_SYSTEM_DATA_PACKET) {
+            MainWindow *mainWin = qobject_cast<MainWindow*>(parent());
+            if (mainWin) {
+                mainWin->updateSystemData(sysMsg); // Päivitä GUI suoraan
+            }
+        }
+    }
     if (data.size() >= sizeof(can_msg_to_pc)) {
         can_msg_to_pc *msg = reinterpret_cast<can_msg_to_pc*>(const_cast<char*>(data.data()));
         if (msg->id == ID_J1939_MSG) {
@@ -76,40 +86,6 @@ void SerialCommunicator::processPacket(const QByteArray &data)
             for (int i = 0; i < 8; i++) {
                 message += QString("%1 ").arg(msg->frame.data[i], 2, 16, QChar('0'));
             }
-            emit messageReceived(message);
-        } else if (msg->id == ID_SYSTEM_DATA_PACKET && data.size() >= sizeof(system_data_to_pc)) {
-            system_data_to_pc *sysMsg = reinterpret_cast<system_data_to_pc*>(const_cast<char*>(data.data()));
-            QString message = QString("System Data - Version: %1, Current Kauha: %2\n")
-                                  .arg(sysMsg->data.version)
-                                  .arg(sysMsg->data.current_kauha);
-            message += "Kulma Anturit:\n";
-            for (int i = 0; i < 4; i++) {
-                message += QString("  Anturi %1: Last Kulma: %2, Position: %3, Last Update: %4\n")
-                .arg(i)
-                    .arg(sysMsg->data.kulma_anturit[i].last_kulma)
-                    .arg(sysMsg->data.kulma_anturit[i].position)
-                    .arg(sysMsg->data.kulma_anturit[i].last_update);
-            }
-            message += "Puomit:\n";
-            for (int i = 0; i < 3; i++) {
-                message += QString("  Puomi %1: Pituus: %2, Korjaus: %3\n")
-                .arg(i)
-                    .arg(sysMsg->data.puomit[i].pituus)
-                    .arg(sysMsg->data.puomit[i].korjaus);
-            }
-            message += "Kauhat:\n";
-            for (int i = 0; i < 5; i++) {
-                message += QString("  Kauha %1: Name: %2, Pituus: %3, Korjaus: %4\n")
-                .arg(i)
-                    .arg(QString(sysMsg->data.kauhat[i].disp_name))
-                    .arg(sysMsg->data.kauhat[i].pituus)
-                    .arg(sysMsg->data.kauhat[i].korjaus);
-            }
-            message += QString("Korkeus: %1, Korkeus ilman kaatoa: %2, Kaato: %3, Tila: %4")
-                           .arg(sysMsg->data.korkeus)
-                           .arg(sysMsg->data.korkeus_ilman_kaatoa)
-                           .arg(sysMsg->data.kaato)
-                           .arg(sysMsg->data.tila);
             emit messageReceived(message);
         }
     }

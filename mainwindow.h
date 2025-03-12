@@ -15,6 +15,8 @@ class MainWindow : public QMainWindow
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
+    void updateSystemData(const system_data_to_pc *packet);
+
 
 private slots:
     void displayMessage(const QString &message);
