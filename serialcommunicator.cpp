@@ -1,5 +1,4 @@
 #include "serialcommunicator.h"
-#include "mainwindow.h"
 #include <QDebug>
 
 SerialCommunicator::SerialCommunicator(QObject *parent)
@@ -37,58 +36,96 @@ void SerialCommunicator::closeSerialPort()
     if (m_serialPort->isOpen())
         m_serialPort->close();
 }
-
+int SerialCommunicator::getPacketSize(uint8_t packetId) const
+{
+    switch (packetId) {
+    case ID_SYSTEM_DATA_PACKET:
+        return sizeof(system_data_to_pc);
+    case ID_J1939_MSG:
+        return sizeof(can_msg_to_pc);
+    default:
+        return -1; // Tuntematon paketti
+    }
+}
 void SerialCommunicator::handleReadyRead()
 {
     m_buffer.append(m_serialPort->readAll());
     qDebug() << "Received buffer size:" << m_buffer.size();
 
-    while (m_buffer.size() >= sizeof(system_data_to_pc)) {
+    while (m_buffer.size() > 0) {
+        // Etsi aloitusmerkki
         int startIdx = m_buffer.indexOf(char(0xAA));
         if (startIdx == -1) {
-            m_buffer.clear();
+            m_buffer.clear(); // Ei aloitusmerkkiä, tyhjennä puskuri
             return;
         }
 
         if (startIdx > 0) {
-            m_buffer = m_buffer.mid(startIdx);
+            m_buffer = m_buffer.mid(startIdx); // Poista roska alusta
         }
 
-        system_data_to_pc *sysMsg = reinterpret_cast<system_data_to_pc*>(m_buffer.data());
-        if (sysMsg->start == 0xAA && sysMsg->end == 0xBB && sysMsg->id == ID_SYSTEM_DATA_PACKET) {
-            processPacket(m_buffer.left(sizeof(system_data_to_pc)));
-            m_buffer = m_buffer.mid(sizeof(system_data_to_pc));
+        // Varmista, että puskurissa on ainakin minimimäärä dataa (start + id)
+        if (m_buffer.size() < 2) {
+            return; // Odota lisää dataa
+        }
+
+        // Lue paketin id (oletetaan, että se on heti start-merkin jälkeen)
+        uint8_t packetId = static_cast<uint8_t>(m_buffer[1]);
+        int packetSize = getPacketSize(packetId);
+
+        if (packetSize == -1) {
+            // Tuntematon pakettityyppi, siirry seuraavaan tavuun
+            m_buffer = m_buffer.mid(1);
             continue;
         }
-        m_buffer = m_buffer.mid(1); // Ohita virheellinen paketti
+
+        // Varmista, että koko paketti on puskurissa
+        if (m_buffer.size() < packetSize) {
+            return; // Odota lisää dataa
+        }
+
+        // Tarkista paketin rakenne
+        const uint8_t *data = (uint8_t*)m_buffer.constData();
+        if (data[0] == 0xAA && data[packetSize - 1] == 0xBB) {
+            // Kelvollinen paketti, käsittele se
+            processPacket(m_buffer.left(packetSize));
+            m_buffer = m_buffer.mid(packetSize); // Poista käsitelty paketti
+        } else {
+            // Virheellinen paketti, siirry seuraavaan tavuun
+            m_buffer = m_buffer.mid(1);
+        }
     }
 }
 
 void SerialCommunicator::processPacket(const QByteArray &data)
 {
-    if (data.size() >= sizeof(system_data_to_pc)) {
-        system_data_to_pc *sysMsg = reinterpret_cast<system_data_to_pc*>(const_cast<char*>(data.data()));
-        if (sysMsg->id == ID_SYSTEM_DATA_PACKET) {
-            MainWindow *mainWin = qobject_cast<MainWindow*>(parent());
-            if (mainWin) {
-                mainWin->updateSystemData(sysMsg); // Päivitä GUI suoraan
-            }
-        }
+    uint8_t packetId = static_cast<uint8_t>(data[1]);
+    if (packetId == ID_SYSTEM_DATA_PACKET && data.size() >= sizeof(system_data_to_pc)) {
+        const system_data_to_pc *sysMsg = reinterpret_cast<const system_data_to_pc*>(data.constData());
+        processSystemDataPacket(*sysMsg);
+    } else if (packetId == ID_J1939_MSG && data.size() >= sizeof(can_msg_to_pc)) {
+        const can_msg_to_pc *msg = reinterpret_cast<const can_msg_to_pc*>(data.constData());
+        processCanMsgPacket(*msg);
     }
-    if (data.size() >= sizeof(can_msg_to_pc)) {
-        can_msg_to_pc *msg = reinterpret_cast<can_msg_to_pc*>(const_cast<char*>(data.data()));
-        if (msg->id == ID_J1939_MSG) {
-            QString message = QString("J1939 Message - ID: %1, PGN: %2, Priority: %3, Source: %4, Data: ")
-            .arg(msg->id)
-                .arg(msg->frame.pgn)
-                .arg(msg->frame.priority)
-                .arg(msg->frame.sourceAddr);
-            for (int i = 0; i < 8; i++) {
-                message += QString("%1 ").arg(msg->frame.data[i], 2, 16, QChar('0'));
-            }
-            emit messageReceived(message);
-        }
+}
+
+
+void SerialCommunicator::processSystemDataPacket(const system_data_to_pc &packet)
+{
+    emit systemDataReceived(packet); // Emitoi signaali GUI-päivitystä varten
+}
+
+void SerialCommunicator::processCanMsgPacket(const can_msg_to_pc &msg)
+{
+    QString message = QString("J1939 Message - ID: %1, PGN: %2, Priority: %3, Source: %4, Data: ")
+    .arg(msg.id)
+        .arg(msg.frame.pgn)
+        .arg(msg.frame.priority)
+        .arg(msg.frame.sourceAddr);
+    for (int i = 0; i < 8; i++) {
+        message += QString("%1 ").arg(msg.frame.data[i], 2, 16, QChar('0'));
     }
+    emit messageReceived(message);
 }
 
 void SerialCommunicator::handleError(QSerialPort::SerialPortError error)
