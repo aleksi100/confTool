@@ -30,6 +30,8 @@ private:
     void processPacket(const QByteArray &data);
     void processSystemDataPacket(const system_data_to_pc &packet);
     void processCanMsgPacket(const can_msg_to_pc &msg);
+    void processErrorPacket(const msg_packet_t &msg);
+    void processInfoPacket(const msg_packet_t &msg);
     int getPacketSize(uint8_t packetId) const;
 };
 

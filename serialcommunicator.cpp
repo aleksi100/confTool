@@ -43,6 +43,10 @@ int SerialCommunicator::getPacketSize(uint8_t packetId) const
         return sizeof(system_data_to_pc);
     case ID_J1939_MSG:
         return sizeof(can_msg_to_pc);
+    case ID_ERROR_MSG:
+        return sizeof(msg_packet_t);
+    case ID_INFO_MSG:
+        return sizeof(msg_packet_t);
     default:
         return -1; // Tuntematon paketti
     }
@@ -106,6 +110,12 @@ void SerialCommunicator::processPacket(const QByteArray &data)
     } else if (packetId == ID_J1939_MSG && data.size() >= sizeof(can_msg_to_pc)) {
         const can_msg_to_pc *msg = reinterpret_cast<const can_msg_to_pc*>(data.constData());
         processCanMsgPacket(*msg);
+    }else if (packetId == ID_ERROR_MSG && data.size() >= sizeof(msg_packet_t)) {
+        const msg_packet_t *msg = reinterpret_cast<const msg_packet_t*>(data.constData());
+        processErrorPacket(*msg);
+    }else if (packetId == ID_INFO_MSG && data.size() >= sizeof(msg_packet_t)) {
+        const msg_packet_t *msg = reinterpret_cast<const msg_packet_t*>(data.constData());
+        processInfoPacket(*msg);
     }
 }
 
@@ -125,6 +135,16 @@ void SerialCommunicator::processCanMsgPacket(const can_msg_to_pc &msg)
     for (int i = 0; i < 8; i++) {
         message += QString("%1 ").arg(msg.frame.data[i], 2, 16, QChar('0'));
     }
+    emit messageReceived(message);
+}
+void SerialCommunicator::processInfoPacket(const msg_packet_t &msg)
+{
+    QString message = QString("stm32 -> Info: %1").arg(msg.msg);
+    emit messageReceived(message);
+}
+void SerialCommunicator::processErrorPacket(const msg_packet_t &msg)
+{
+    QString message = QString("stm32 -> Error: %1").arg(msg.msg);
     emit messageReceived(message);
 }
 

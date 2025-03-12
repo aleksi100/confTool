@@ -43,6 +43,8 @@ typedef struct {
 // PAKETIT TIETOKONEELLE
 #define ID_J1939_MSG (0x11)
 #define ID_SYSTEM_DATA_PACKET (0x22)
+#define ID_ERROR_MSG (0x33)
+#define ID_INFO_MSG (0x44)
 typedef struct {
     uint8_t start;
     uint8_t id;
@@ -56,6 +58,12 @@ typedef struct {
     system_data_t data;
     uint8_t end;
 } system_data_to_pc;
+typedef struct{
+    uint8_t start;
+    uint8_t id;
+    char msg[64];
+    uint8_t end;
+}msg_packet_t;
 #pragma pack()
 
 #endif // TYPES_H
