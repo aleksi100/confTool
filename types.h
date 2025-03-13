@@ -23,7 +23,7 @@ typedef struct {
 typedef struct {
     J1939_Message_t name_id;
     J1939_Message_t last_kulma_frame;
-    int last_kulma;
+    int16_t last_kulma;
     int position;
     int last_update;
 } kulma_anturi_t;
@@ -64,6 +64,14 @@ typedef struct{
     char msg[64];
     uint8_t end;
 }msg_packet_t;
+
+// KOMENTOPAKETTI
+typedef struct
+{
+    uint8_t start;
+    char msg[45];
+    uint8_t end;
+}cmd_packet_t;
 #pragma pack()
 
 #endif // TYPES_H

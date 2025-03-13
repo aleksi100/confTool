@@ -14,6 +14,7 @@ public:
 
     bool openSerialPort(const QString &portName);
     void closeSerialPort();
+    bool sendComandPacket(cmd_packet_t &packet);
 
 signals:
     void messageReceived(const QString &message);

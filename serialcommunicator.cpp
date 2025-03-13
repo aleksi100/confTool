@@ -155,3 +155,10 @@ void SerialCommunicator::handleError(QSerialPort::SerialPortError error)
         emit messageReceived("Serial port error: " + m_serialPort->errorString());
     }
 }
+bool SerialCommunicator::sendComandPacket(cmd_packet_t &packet){
+    int bytes_send = m_serialPort->write(reinterpret_cast<const char *>(&packet), sizeof(cmd_packet_t));
+    if(bytes_send != sizeof(cmd_packet_t)){
+        return true;
+    }
+    return false;
+}

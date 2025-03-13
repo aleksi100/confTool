@@ -21,6 +21,7 @@ private slots:
     void displayMessage(const QString &message);
     void updateSystemData(const system_data_to_pc &packet);
     void tryConnectionPeriodically();
+    void handleSendClicked();
 
 private:
     Ui::MainWindow *ui;

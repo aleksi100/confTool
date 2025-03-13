@@ -16,10 +16,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_serialComm, &SerialCommunicator::systemDataReceived,
             this, &MainWindow::updateSystemData); // Uusi yhteys signaaliin
 
-    // if (!m_serialComm->openSerialPort("COM5")) {
-    //     ui->debugTextEdit->append("Failed to open serial port");
-    // }
-    // Alusta ajastin
+    connect(ui->sendCmdBtn, &QPushButton::clicked, this, &MainWindow::handleSendClicked);
     m_connectionTimer = new QTimer(this);
     connect(m_connectionTimer, &QTimer::timeout, this, &MainWindow::tryConnectionPeriodically);
     m_connectionTimer->start(1000); // Aloita ajastin, joka laukaisee sekunnin välein
@@ -133,5 +130,22 @@ void MainWindow::printDebug(const QString &msg){
     int scrollPosition = debug_scrollBar->value();
     ui->debugTextEdit->append(msg);
     debug_scrollBar->setValue(scrollPosition);
+
+}
+
+void MainWindow::handleSendClicked(){
+    QString msg = ui->sendCmdLineEdit->text();
+    cmd_packet_t packet;
+    packet.start = 0xaa;
+    packet.end = 0xbb;
+    QByteArray msg_bytesArray = msg.toUtf8();
+    strncpy(packet.msg, msg_bytesArray.constData(), sizeof(packet.msg));
+    if(packet.msg[sizeof(packet.msg)-1] != 0){
+        printDebug("Liian pitkä viesti");
+    }else{
+        if(m_serialComm->sendComandPacket(packet)){
+            // Käsittele error jos jaksat
+        }
+    }
 
 }
