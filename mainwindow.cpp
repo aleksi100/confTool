@@ -1,6 +1,8 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include <QScrollBar>
+#include <QSerialPortInfo>
+#include <QDebug>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -14,8 +16,17 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_serialComm, &SerialCommunicator::systemDataReceived,
             this, &MainWindow::updateSystemData); // Uusi yhteys signaaliin
 
-    if (!m_serialComm->openSerialPort("COM5")) {
-        ui->debugTextEdit->append("Failed to open serial port");
+    // if (!m_serialComm->openSerialPort("COM5")) {
+    //     ui->debugTextEdit->append("Failed to open serial port");
+    // }
+    // Alusta ajastin
+    m_connectionTimer = new QTimer(this);
+    connect(m_connectionTimer, &QTimer::timeout, this, &MainWindow::tryConnectionPeriodically);
+    m_connectionTimer->start(1000); // Aloita ajastin, joka laukaisee sekunnin välein
+
+    // Yritä heti alussa yhdistää
+    if (tryToConnectToCorrectSerialPort() == 1) {
+        m_isConnected = true;
     }
 }
 
@@ -26,7 +37,7 @@ MainWindow::~MainWindow()
 
 void MainWindow::displayMessage(const QString &message)
 {
-    ui->debugTextEdit->append(message);
+    printDebug(message);
 }
 
 void MainWindow::updateSystemData(const system_data_to_pc &packet)
@@ -79,4 +90,48 @@ void MainWindow::updateSystemData(const system_data_to_pc &packet)
     scrollPosition = anturi_info_scrollBar->value();
     ui->anturi_info_textBrowser->setText(text);
     anturi_info_scrollBar->setValue(scrollPosition);
+}
+
+void MainWindow::tryConnectionPeriodically()
+{
+    if (!m_isConnected) {
+        if (tryToConnectToCorrectSerialPort() == 1) {
+            m_isConnected = true;
+            m_connectionTimer->stop(); // Lopeta ajastin, kun yhteys onnistuu
+            printDebug("Connection established, timer stopped.");
+        }
+    }
+}
+
+int MainWindow::tryToConnectToCorrectSerialPort()
+{
+    const auto ports = QSerialPortInfo::availablePorts();
+    for (const QSerialPortInfo &info : ports) {
+        qDebug() << "Checking port:" << info.portName()
+        << "VID:" << QString::number(info.vendorIdentifier(), 16).toUpper()
+        << "PID:" << QString::number(info.productIdentifier(), 16).toUpper()
+        << "Description:" << info.description();
+
+        if (info.vendorIdentifier() == 1155 &&
+            info.productIdentifier() == 0x1333) {
+
+            if (m_serialComm->openSerialPort(info.portName())) {
+                printDebug("Auto-connected to " + info.portName() +
+                                          " (Description: " + info.description() + ")");
+                return 1; // Onnistui
+            } else {
+
+                printDebug("Failed to connect to " + info.portName());
+            }
+        }
+    }
+    ui->debugTextEdit->append("No suitable serial port found with VID=0x1155, PID=0x1333");
+    return 0; // Epäonnistui
+}
+void MainWindow::printDebug(const QString &msg){
+    QScrollBar *debug_scrollBar = ui->debugTextEdit->verticalScrollBar();
+    int scrollPosition = debug_scrollBar->value();
+    ui->debugTextEdit->append(msg);
+    debug_scrollBar->setValue(scrollPosition);
+
 }

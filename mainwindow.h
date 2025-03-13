@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QTimer>
 #include "serialcommunicator.h"
 
 QT_BEGIN_NAMESPACE
@@ -18,10 +19,15 @@ public:
 
 private slots:
     void displayMessage(const QString &message);
-    void updateSystemData(const system_data_to_pc &packet); // Muutettu osoittimesta referenssiksi
+    void updateSystemData(const system_data_to_pc &packet);
+    void tryConnectionPeriodically();
 
 private:
     Ui::MainWindow *ui;
     SerialCommunicator *m_serialComm;
+    int tryToConnectToCorrectSerialPort();
+    bool m_isConnected;
+    QTimer *m_connectionTimer;
+    void printDebug(const QString &msg);
 };
 #endif // MAINWINDOW_H
