@@ -19,7 +19,7 @@ public:
 
 private slots:
     void displayMessage(const QString &message);
-    void updateSystemData(const system_data_to_pc &packet);
+    void updateSystemData(const system_data_t &packet);
     void tryConnectionPeriodically();
     void handleSendClicked();
 
@@ -30,5 +30,7 @@ private:
     bool m_isConnected;
     QTimer *m_connectionTimer;
     void printDebug(const QString &msg);
+    system_data_t system_data;
+
 };
 #endif // MAINWINDOW_H

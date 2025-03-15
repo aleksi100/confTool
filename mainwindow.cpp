@@ -37,17 +37,18 @@ void MainWindow::displayMessage(const QString &message)
     printDebug(message);
 }
 
-void MainWindow::updateSystemData(const system_data_to_pc &packet)
+void MainWindow::updateSystemData(const system_data_t &packet)
 {
+    system_data = packet;
     QString text;
 
     // Basic Info
-    text += QString("Version: %1\n").arg(packet.data.version);
-    text += QString("Current Kauha: %1\n").arg(packet.data.current_kauha);
-    text += QString("Korkeus: %1\n").arg(packet.data.korkeus);
-    text += QString("Korkeus ilman kaatoa: %1\n").arg(packet.data.korkeus_ilman_kaatoa);
-    text += QString("Kaato: %1\n").arg(packet.data.kaato);
-    text += QString("Tila: %1\n").arg(packet.data.tila);
+    text += QString("Version: %1\n").arg(packet.version);
+    text += QString("Current Kauha: %1\n").arg(packet.current_kauha);
+    text += QString("Korkeus: %1\n").arg(packet.korkeus);
+    text += QString("Korkeus ilman kaatoa: %1\n").arg(packet.korkeus_ilman_kaatoa);
+    text += QString("Kaato: %1\n").arg(packet.kaato);
+    text += QString("Tila: %1\n").arg(packet.tila);
 
     QScrollBar *system_info_scrollBar = ui->system_info_textBrowser->verticalScrollBar();
     int scrollPosition = system_info_scrollBar->value();
@@ -58,17 +59,17 @@ void MainWindow::updateSystemData(const system_data_to_pc &packet)
     // Puomit
     for (int i = 0; i < 3; i++) {
         text += QString("Puomi %1:\n").arg(i);
-        text += QString("  Pituus: %1\n").arg(packet.data.puomit[i].pituus);
-        text += QString("  Korjaus: %1\n").arg(packet.data.puomit[i].korjaus);
+        text += QString("  Pituus: %1\n").arg(packet.puomit[i].pituus);
+        text += QString("  Korjaus: %1\n").arg(packet.puomit[i].korjaus);
     }
     text += "\n";
 
     // Kauhat
     for (int i = 0; i < 5; i++) {
         text += QString("Kauha %1:\n").arg(i);
-        text += QString("  Name: %1\n").arg(QString(packet.data.kauhat[i].disp_name));
-        text += QString("  Pituus: %1\n").arg(packet.data.kauhat[i].pituus);
-        text += QString("  Korjaus: %1\n").arg(packet.data.kauhat[i].korjaus);
+        text += QString("  Name: %1\n").arg(QString(packet.kauhat[i].disp_name));
+        text += QString("  Pituus: %1\n").arg(packet.kauhat[i].pituus);
+        text += QString("  Korjaus: %1\n").arg(packet.kauhat[i].korjaus);
     }
     QScrollBar *puomisto_info_scrollBar = ui->puomisto_info_textBrowser->verticalScrollBar();
     scrollPosition = puomisto_info_scrollBar->value();
@@ -78,9 +79,9 @@ void MainWindow::updateSystemData(const system_data_to_pc &packet)
     text = "";
     for (int i = 0; i < 4; i++) {
         text += QString("Anturi %1:\n").arg(i);
-        text += QString("  Last Kulma: %1\n").arg(packet.data.kulma_anturit[i].last_kulma);
-        text += QString("  Position: %1\n").arg(packet.data.kulma_anturit[i].position);
-        text += QString("  Last Update: %1\n").arg(packet.data.kulma_anturit[i].last_update);
+        text += QString("  Last Kulma: %1\n").arg(packet.kulma_anturit[i].last_kulma);
+        text += QString("  Position: %1\n").arg(packet.kulma_anturit[i].position);
+        text += QString("  Last Update: %1\n").arg(packet.kulma_anturit[i].last_update);
     }
     text += "\n";
     QScrollBar *anturi_info_scrollBar = ui->anturi_info_textBrowser->verticalScrollBar();
@@ -91,11 +92,11 @@ void MainWindow::updateSystemData(const system_data_to_pc &packet)
 
 void MainWindow::tryConnectionPeriodically()
 {
-    if (!m_isConnected) {
+    qDebug() << m_serialComm->isSerialPortOpen();
+    if (!m_serialComm->isSerialPortOpen()) {
         if (tryToConnectToCorrectSerialPort() == 1) {
-            m_isConnected = true;
-            m_connectionTimer->stop(); // Lopeta ajastin, kun yhteys onnistuu
-            printDebug("Connection established, timer stopped.");
+            //m_connectionTimer->stop(); // Lopeta ajastin, kun yhteys onnistuu
+            printDebug("Connection established");
         }
     }
 }
@@ -126,26 +127,40 @@ int MainWindow::tryToConnectToCorrectSerialPort()
     return 0; // Epäonnistui
 }
 void MainWindow::printDebug(const QString &msg){
-    QScrollBar *debug_scrollBar = ui->debugTextEdit->verticalScrollBar();
-    int scrollPosition = debug_scrollBar->value();
-    ui->debugTextEdit->append(msg);
-    debug_scrollBar->setValue(scrollPosition);
+
+    if(!ui->autoScroll_radioButton->isChecked()){
+        QScrollBar *debug_scrollBar = ui->debugTextEdit->verticalScrollBar();
+        int scrollPosition = debug_scrollBar->value();
+        ui->debugTextEdit->append(msg);
+        debug_scrollBar->setValue(scrollPosition);
+
+    }else{
+        ui->debugTextEdit->append(msg);
+    }
 
 }
 
 void MainWindow::handleSendClicked(){
+    system_data_t m_system_data;
+    memcpy(&m_system_data, &system_data, sizeof(system_data_t));
     QString msg = ui->sendCmdLineEdit->text();
-    cmd_packet_t packet;
-    packet.start = 0xaa;
-    packet.end = 0xbb;
-    QByteArray msg_bytesArray = msg.toUtf8();
-    strncpy(packet.msg, msg_bytesArray.constData(), sizeof(packet.msg));
-    if(packet.msg[sizeof(packet.msg)-1] != 0){
-        printDebug("Liian pitkä viesti");
-    }else{
-        if(m_serialComm->sendComandPacket(packet)){
-            // Käsittele error jos jaksat
+    QStringList msg_osat = msg.split(" ");
+    QString root_var = msg_osat[0].split(".")[0];
+    QString var = msg_osat[0].split(".")[1];
+    QString operand = msg_osat[1];
+    QByteArray value = msg_osat[2].toUtf8();
+    if(root_var == "kauha1"){
+        if(var == "nimi"){
+            strncpy(m_system_data.kauhat[0].disp_name, value.constData(), sizeof(system_data.kauhat[0].disp_name));
         }
     }
+
+
+    qDebug() << "kauhan nimi " << m_system_data.kauhat[0].disp_name;
+    if(m_serialComm->sendPacketToSerial(m_system_data)){
+        qDebug() << "error viesti ei lähtenyut";
+            // Käsittele error jos jaksat
+    }
+
 
 }

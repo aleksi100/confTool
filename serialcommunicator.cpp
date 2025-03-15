@@ -40,7 +40,7 @@ int SerialCommunicator::getPacketSize(uint8_t packetId) const
 {
     switch (packetId) {
     case ID_SYSTEM_DATA_PACKET:
-        return sizeof(system_data_to_pc);
+        return sizeof(system_data_t);
     case ID_J1939_MSG:
         return sizeof(can_msg_to_pc);
     case ID_ERROR_MSG:
@@ -104,8 +104,8 @@ void SerialCommunicator::handleReadyRead()
 void SerialCommunicator::processPacket(const QByteArray &data)
 {
     uint8_t packetId = static_cast<uint8_t>(data[1]);
-    if (packetId == ID_SYSTEM_DATA_PACKET && data.size() >= sizeof(system_data_to_pc)) {
-        const system_data_to_pc *sysMsg = reinterpret_cast<const system_data_to_pc*>(data.constData());
+    if (packetId == ID_SYSTEM_DATA_PACKET && data.size() >= sizeof(system_data_t)) {
+        const system_data_t *sysMsg = reinterpret_cast<const system_data_t*>(data.constData());
         processSystemDataPacket(*sysMsg);
     } else if (packetId == ID_J1939_MSG && data.size() >= sizeof(can_msg_to_pc)) {
         const can_msg_to_pc *msg = reinterpret_cast<const can_msg_to_pc*>(data.constData());
@@ -120,7 +120,7 @@ void SerialCommunicator::processPacket(const QByteArray &data)
 }
 
 
-void SerialCommunicator::processSystemDataPacket(const system_data_to_pc &packet)
+void SerialCommunicator::processSystemDataPacket(const system_data_t &packet)
 {
     emit systemDataReceived(packet); // Emitoi signaali GUI-päivitystä varten
 }
@@ -153,12 +153,18 @@ void SerialCommunicator::handleError(QSerialPort::SerialPortError error)
     if (error != QSerialPort::NoError) {
         qDebug() << "Serial port error:" << m_serialPort->errorString();
         emit messageReceived("Serial port error: " + m_serialPort->errorString());
+        closeSerialPort();
+
     }
 }
-bool SerialCommunicator::sendComandPacket(cmd_packet_t &packet){
-    int bytes_send = m_serialPort->write(reinterpret_cast<const char *>(&packet), sizeof(cmd_packet_t));
-    if(bytes_send != sizeof(cmd_packet_t)){
+bool SerialCommunicator::isSerialPortOpen(){
+    return m_serialPort->isOpen();
+}
+bool SerialCommunicator::sendPacketToSerial(system_data_t &packet){
+    int bytes_send = m_serialPort->write(reinterpret_cast<const char *>(&packet), sizeof(packet));
+    if(bytes_send != sizeof(packet)){
         return true;
     }
     return false;
 }
+

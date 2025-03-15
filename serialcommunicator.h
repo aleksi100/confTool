@@ -13,12 +13,13 @@ public:
     ~SerialCommunicator();
 
     bool openSerialPort(const QString &portName);
+    bool isSerialPortOpen();
     void closeSerialPort();
-    bool sendComandPacket(cmd_packet_t &packet);
+    bool sendPacketToSerial(system_data_t &packet);
 
 signals:
     void messageReceived(const QString &message);
-    void systemDataReceived(const system_data_to_pc &packet); // Uusi signaali
+    void systemDataReceived(const system_data_t &packet); // Uusi signaali
 
 private slots:
     void handleReadyRead();
@@ -29,11 +30,12 @@ private:
     QByteArray m_buffer;
 
     void processPacket(const QByteArray &data);
-    void processSystemDataPacket(const system_data_to_pc &packet);
+    void processSystemDataPacket(const system_data_t &packet);
     void processCanMsgPacket(const can_msg_to_pc &msg);
     void processErrorPacket(const msg_packet_t &msg);
     void processInfoPacket(const msg_packet_t &msg);
     int getPacketSize(uint8_t packetId) const;
+
 };
 
 #endif // SERIALCOMMUNICATOR_H
